@@ -28,6 +28,6 @@ docker build -t my-ffmpeg:2 .
 
 
 ```{bash}
-docker run -v $(pwd)/output:/output my-ffmpeg:2 .
+docker run -v $(pwd)/output:/output my-ffmpeg:2 
 ```
 

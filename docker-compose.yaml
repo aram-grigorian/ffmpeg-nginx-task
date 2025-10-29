@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  ffmpeg:
+    build: .
+    restart: "no"
+    volumes:
+      - shared-output:/output
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    depends_on:
+      - ffmpeg
+    volumes:
+      - shared-output:/usr/share/nginx/html
+      - ./index.html:/usr/share/nginx/html/index.html
+
+volumes:
+  shared-output:
