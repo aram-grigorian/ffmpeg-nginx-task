@@ -229,7 +229,7 @@ Open your browser and visit:
 http://<your-ec2-public-ip>
 ```
 
-You should see a beautiful web page displaying the last frame from the video! 🎉
+You should see a beautiful web page displaying the pooping bird from the video! 🎉
 
 ---
 
@@ -267,24 +267,12 @@ Type `yes` when prompted.
 
 - [ ] Integrate Ansible with Terraform using `local-exec` provisioner (run everything with just `terraform apply`)
 - [ ] Add health checks and auto-restart for containers
-- [ ] Implement continuous frame updates for live streams
-- [ ] Add SSL/TLS with Let's Encrypt
-- [ ] Set up CloudWatch monitoring and alerting
+- [ ] Implement continuous frame updates for live streams (in this case it was a video file)
 - [ ] Use S3 for persistent frame storage
+- [ ] Use S3 for state storage
 - [ ] Add CI/CD pipeline with GitHub Actions
 
 ---
 
-## 🤝 Contributing
 
-Feel free to open issues or submit pull requests if you find ways to improve this project!
-
----
-
-## 📜 License
-
-This project is open source and available under the [MIT License](LICENSE).
-
----
-
-**Built with ❤️ using Terraform, Ansible, Docker, FFMPEG, and NGINX**
+**Built with haves using Terraform, Ansible, Docker, FFMPEG, and NGINX**
