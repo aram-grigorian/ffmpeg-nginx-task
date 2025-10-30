@@ -7,6 +7,7 @@ terraform {
 
     tls = {
       source = "hashicorp/tls"
+      version = "~> 4.0"
     }
 
     local = {
@@ -23,5 +24,5 @@ terraform {
 
 provider "aws" {
   region  = var.aws_region
-  profile = "default"
+  profile = var.aws_auth_profile
 }

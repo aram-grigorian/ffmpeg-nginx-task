@@ -17,3 +17,8 @@ variable "instance_type" {
   description = "EC2 instance type"
   type        = string
 }
+
+variable "aws_auth_profile" {
+  description = "The AWS CLI Profile for Authentication"
+  type = string
+}
