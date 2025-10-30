@@ -1,6 +1,6 @@
 FROM jrottenberg/ffmpeg:7-ubuntu
 
-VOLUME [ "/output" ]
+# VOLUME [ "/output" ]
 
 WORKDIR /ffmpeg
 
@@ -13,4 +13,6 @@ RUN chmod +x ./ffmpeg-lastframe.sh
 ENTRYPOINT [ "bash" ]
 
 CMD [ "./ffmpeg-lastframe.sh" ]
+
+
 

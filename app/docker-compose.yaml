@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3.8'
 
 services:
   ffmpeg:
@@ -12,7 +12,9 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - ffmpeg
+      ffmpeg:
+        condition: service_completed_successfully
+
     volumes:
       - shared-output:/usr/share/nginx/html
       - ./index.html:/usr/share/nginx/html/index.html
