@@ -20,5 +20,10 @@ variable "instance_type" {
 
 variable "aws_auth_profile" {
   description = "The AWS CLI Profile for Authentication"
-  type = string
+  type        = string
+}
+
+variable "vpc_name" {
+  description = "Name of the VPC"
+  type        = string
 }
