@@ -1,7 +1,5 @@
 FROM jrottenberg/ffmpeg:7-ubuntu
 
-# VOLUME [ "/output" ]
-
 WORKDIR /ffmpeg
 
 COPY ./ffmpeg-lastframe.sh /ffmpeg/

@@ -1,278 +1,320 @@
-## Task Description
+# 🎬 FFMPEG Video Frame Extractor
 
- - Write a solution using Docker + Ansible
- - The Solution should spin up a Linux host which will show the newest/last frame from the given stream
- - Stream URL: https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4
- - For web hosting NGINX can be used, and for stream processing ffmpeg docker image can be used
- - The frame should be shown at the index level
- - NGINX Configuration should not affect the availability of the solution
- - If I got everything right should be this image
+> *Automated infrastructure deployment for extracting and serving video frames via Docker, orchestrated with Terraform and Ansible.*
 
-# 🎬 Video Frame Extractor - Terraform + Ansible + Docker
-
-> *Because sometimes you just need that one perfect frame, automated and containerized.*
-
-A fully automated solution that deploys an FFMPEG + NGINX stack to AWS EC2, extracting and displaying the latest frame from a video stream. Built with Terraform for infrastructure, Ansible for deployment, and Docker for containerization.
+A fully automated solution that provisions AWS infrastructure and deploys a containerized FFMPEG + NGINX application to extract and display the last frame from a video stream. The entire stack is managed as code with zero-touch deployment.
 
 ---
 
-## 🎯 What Does This Do?
+## 🎯 Overview
 
-This project spins up a complete web server on AWS that:
-- 📹 Extracts the last frame from a video stream using FFMPEG
-- 🖼️ Displays it on a clean web interface via NGINX
-- 🐳 Runs everything in isolated Docker containers
-- 🤖 Deploys automatically with Ansible
-- ☁️ Infrastructure managed as code with Terraform
+This project demonstrates Infrastructure as Code (IaC) best practices by combining:
+- **Terraform** for AWS infrastructure provisioning
+- **Ansible** for automated application deployment  
+- **Docker Compose** for container orchestration
+- **FFMPEG** for video processing
+- **NGINX** for web serving
+- **AWS** CLI Authentication, which will save the profile to ~/.aws/credentials
 
-**Live Demo:** Once deployed, just visit `http://<your-ec2-ip>` and boom - there's your frame!
+**One-command deployment:** Simply run `terraform apply` and the entire infrastructure, networking, compute, and application stack deploys automatically.
 
+---
+
+## 🏗️ Architecture
+
+![Architecture Diagram](arch-diagram.png)
 ---
 
 ## 📋 Prerequisites
 
-Before you begin, make sure you have these tools installed:
+Ensure the following tools are installed on your local machine:
 
-- **Ansible** - For automated deployment
-- **Terraform** - For infrastructure provisioning
-- **Docker** - For local testing (optional but recommended)
-- **Python** - Required by Ansible
-- **AWS CLI** - Configured with valid credentials
-  - *In this project, Terraform authenticates via the default AWS profile at `~/.aws/credentials`*
+| Tool | Purpose | Installation |
+|------|---------|-------------|
+| **Terraform** | Infrastructure provisioning | [Download](https://www.terraform.io/downloads) |
+| **Ansible** | Configuration management | `pip install ansible` |
+| **AWS CLI** | AWS authentication | [Install Guide](https://aws.amazon.com/cli/) |
+| **Python 3** | Required by Ansible | Usually pre-installed |
+
+**AWS Configuration:**
+- Configure AWS CLI with valid credentials: `aws configure`
+- Set your profile in `terraform.tfvars` 
+- Ensure your AWS account has permissions to create VPCs, EC2 instances, and security groups
 
 ---
 
-## 🏗️ Project Structure
+## 📁 Project Structure
+
 ```
 .
-├── app/
-│   ├── Dockerfile                 # Custom FFMPEG image
-│   ├── docker-compose.yaml        # Service orchestration
-│   ├── ffmpeg-lastframe.sh        # Frame extraction script
-│   └── index.html                 # Web interface
 ├── terraform-infra/
-│   ├── vpc.tf                     # VPC and networking
-│   ├── ec2.tf                     # EC2 instance configuration
-│   ├── keys.tf                    # SSH key pair generation
-│   ├── outputs.tf                 # Terraform outputs (IP, SSH command)
-│   └── variables.tf               # Configurable variables
+│   │   ├── vpc.tf              # VPC with 2 public subnets
+│   │   ├── ec2.tf              # EC2 instance with security rules
+│   │   ├── keys.tf             # Auto-generated SSH key pair
+│   │   ├── data.tf             # Ubuntu AMI lookup
+│   │   └── ansible.tf          # Ansible automation trigger
+│   │   ├── variables.tf        # Input variables
+│   │   ├── terraform.tfvars    # Variable values
+│   │   ├── locals.tf           # Local computed values
+│   │   ├── outputs.tf          # Output values (IP, instance ID)
+│   │   └── providers.tf        # Provider versions and config
+│   └── templates/
+│       └── inventory.tpl       # Ansible inventory template
 ├── ansible/
-│   ├── inventory.ini              # Target hosts configuration
-│   └── deploy.yml                 # Deployment playbook
-└── README.md                      # You are here!
+│   ├── inventory.ini           # Auto-generated by Terraform
+│   └── deploy.yml              # Deployment playbook
+└── app/
+    ├── Dockerfile              # Custom FFMPEG image
+    ├── docker-compose.yaml     # Container orchestration
+    ├── ffmpeg-lastframe.sh     # Frame extraction script
+    └── index.html              # Web interface
 ```
 
 ---
 
 ## 🚀 How It Works
 
-### Part 1: The FFMPEG Magic ✨
+### Infrastructure Layer (Terraform)
 
-The heart of this project is the frame extraction script (`ffmpeg-lastframe.sh`):
+**1. VPC & Networking (`vpc.tf`)**
+- Creates a VPC with CIDR `10.0.0.0/16`
+- Provisions 2 public subnets across availability zones: 
+  - `10.0.1.0/24` in `${region}a`
+  - `10.0.2.0/24` in `${region}b`
+- NAT Gateway disabled (public-only architecture)
+- Uses Anton Babenko's official VPC module
 
-1. **Get video duration** using `ffprobe`:
+**2. EC2 Instance (`ec2.tf`)**
+- Launches Ubuntu 22.04 LTS (latest AMI auto-selected via data source)
+- Instance type: `t3.micro` (configurable)
+- Deployed in first public subnet with auto-assigned public IP
+- Security group rules:
+  - Port 22 (SSH) - Open to My Local IP, configured through a Terraform data source
+  - Port 80 (HTTP) - Open to world (0.0.0.0/0)
+- Uses Anton Babenko's EC2 instance module
+
+**3. SSH Key Management (`keys.tf`)**
+- Generates 2048-bit RSA key pair via TLS provider
+- Saves private key as `.pem` file in terraform directory
+- Lifecycle policy prevents key regeneration on updates
+- Key permissions automatically set to `400`
+
+**4. Ansible Integration (`ansible.tf`)**
+- Automatically generates `ansible/inventory.ini` from template
+- Uses absolute path to SSH key for reliability
+- Waits 30 seconds for EC2 instance to be SSH-ready
+- Triggers Ansible playbook automatically after infrastructure is ready
+- Re-runs deployment if inventory changes
+
+### Application Layer (Docker)
+
+**1. FFMPEG Container (`Dockerfile`)**
+- Base image: `jrottenberg/ffmpeg:7-ubuntu`
+- Installs `bc` (binary calculator) for duration math
+- Copies and executes `ffmpeg-lastframe.sh`
+- Runs once and exits after extracting frame
+- Cleans up apt metadata to reduce image size
+
+**2. Frame Extraction Script (`ffmpeg-lastframe.sh`)**
 ```bash
-   DURATION=$(ffprobe -v error -show_entries format=duration \
-     -of default=noprint_wrappers=1:nokey=1 "$INPUT_VIDEO")
+# 1. Get total video duration using ffprobe
+DURATION=$(ffprobe -v error -show_entries format=duration ...)
+
+# 2. Calculate seek position (duration - 0.1 seconds)
+SEEK_TIME=$(echo "$DURATION - 0.1" | bc -l)
+
+# 3. Extract last frame with high quality
+ffmpeg -ss "$SEEK_TIME" -i "$INPUT_VIDEO" -vframes 1 -q:v 1 -y "$OUTPUT_IMAGE"
 ```
 
-2. **Calculate seek time** (duration - 0.1 seconds) using `bc`:
-```bash
-   SEEK_TIME=$(echo "$DURATION - 0.1" | bc -l)
-```
+**How it works:**
+- Uses `ffprobe` to determine video length
+- Calculates exact timestamp for last frame (0.1s before end)
+- Extracts single frame with maximum quality (`-q:v 1`)
+- Saves to shared volume as `last_frame.jpg`
 
-3. **Extract the frame** using `ffmpeg`:
-```bash
-   ffmpeg -ss "$SEEK_TIME" -i "$INPUT_VIDEO" -vframes 1 -q:v 1 -y "$OUTPUT_IMAGE"
-```
+**3. Docker Compose Orchestration (`docker-compose.yaml`)**
 
-This grabs the very last frame from the video with high quality (`-q:v 1`).
-
----
-
-### Part 2: Docker Image 🐳
-
-Built on top of the official `jrottenberg/ffmpeg:7-ubuntu` image, our custom Dockerfile:
-
-- 📦 Uses the official FFMPEG image as base
-- 💾 Mounts an `/output` volume for frame storage
-- 📂 Sets working directory to `/ffmpeg/`
-- 📄 Copies the `ffmpeg-lastframe.sh` script
-- 🔧 Installs `bc` for mathematical calculations
-- 🧹 Removes `/var/lib/apt/lists/*` (reduces image size by cleaning up package metadata after installation)
-- ⚡ Makes the script executable
-- 🎬 Runs the script on container start
-
-**Why remove apt lists?** This metadata is only needed during package installation. Removing it keeps the Docker image lean and production-ready.
-
----
-
-### Part 3: Docker Compose Orchestra 🎼
-
-The `docker-compose.yaml` orchestrates two services:
+Two services connected via shared volume:
 
 **FFMPEG Service:**
-- Builds our custom image
-- Extracts the last frame to a shared volume
-- Runs once and exits (`restart: no`)
+- Builds custom image from Dockerfile
+- Runs once (`restart: no`)
+- Mounts `shared-output` volume to `/output`
+- Exits after successful frame extraction
 
 **NGINX Service:**
 - Uses official `nginx:latest` image
-- Mounts the shared volume to access `last_frame.jpg`
-- Serves `index.html` on port 80
-- Displays the extracted frame in a clean web interface
+- Depends on FFMPEG completion (`service_completed_successfully`)
+- Mounts same `shared-output` volume to web root
+- Overlays custom `index.html` for UI
+- Exposes port 80 to host
 
-**Shared Volume:** Both services use a common volume to pass the extracted frame from FFMPEG to NGINX.
+### Deployment Layer (Ansible)
 
----
+**Playbook (`deploy.yml`) executes these tasks:**
 
-### Part 4: Terraform Infrastructure 🏗️
+1. **System Preparation**
+   - Updates APT cache
+   - Installs dependencies (curl, gnupg, etc.)
 
-Terraform provisions everything on AWS using Anton Babenko's community modules:
+2. **Docker Installation**
+   - Adds Docker GPG key and repository
+   - Installs Docker CE, CLI, and containerd
+   - Enables Docker service
 
-**What gets created:**
-- ☁️ **VPC** with public subnets across 2 availability zones
-- 🖥️ **EC2 instance** (Ubuntu 22.04 on t2.micro)
-- 🔐 **SSH key pair** (auto-generated and saved as `.pem` file)
-- 🛡️ **Security group** with rules:
-  - Port 22 (SSH) - for Ansible access
-  - Port 80 (HTTP) - for web traffic
+3. **Docker Compose Installation**
+   - Downloads Docker Compose v2.23.0 binary
+   - Installs to `/usr/local/bin/docker-compose`
+   - Sets executable permissions
 
-**Key Terraform Outputs:**
-- Public IP address of the EC2 instance
-- SSH command for manual access
-- Path to the generated `.pem` key file
+4. **Application Deployment**
+   - Creates `/home/ffmpeg-app` directory
+   - Copies all app files (Dockerfile, compose file, scripts, HTML)
+   - Sets script permissions
 
-These outputs are used to configure Ansible's inventory file.
-
----
-
-### Part 5: Ansible Deployment 🤖
-
-Ansible automates the entire deployment process with a single playbook.
-
-#### Step 1: Create the Inventory
-
-The `inventory.ini` file tells Ansible where to deploy:
-```ini
-[webservers]
-ec2-instance ansible_host=<PUBLIC_IP> ansible_user=ubuntu ansible_ssh_private_key_file=../terraform-infra/ffmpeg-project-key.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'
-```
-
-**Test the connection:**
-```bash
-ansible -i inventory.ini -m ping ec2-instance
-```
-
-You should get a `pong` response! 🏓
-
-#### Step 2: Run the Deployment Playbook
-```bash
-ansible-playbook -i inventory.ini deploy.yml
-```
-
-**What `deploy.yml` does:**
-1. ✅ Updates apt cache
-2. ✅ Installs Docker and Docker Compose
-3. ✅ Starts Docker service
-4. ✅ Creates `/home/ffmpeg-app` directory
-5. ✅ Copies all application files (Dockerfile, docker-compose.yaml, scripts, HTML)
-6. ✅ Makes the FFMPEG script executable
-7. ✅ Stops any existing containers
-8. ✅ Builds and starts the new containers
-9. ✅ Waits for port 80 to be accessible
+5. **Container Management**
+   - Stops any existing containers
+   - Builds FFMPEG image
+   - Starts both services
+   - Waits for port 80 to be accessible
 
 ---
 
-## 📖 Complete Deployment Guide
+## 📖 Deployment Guide
 
-### 1️⃣ Provision Infrastructure with Terraform
+### Configuration
+
+Edit `terraform-infra/terraform.tfvars` to customize:
+
+```hcl
+aws_region       = "eu-north-1"           # AWS region
+key_name         = "ffmpeg-project-key"   # SSH key name
+instance_name    = "ffmpeg-project-instance"
+instance_type    = "t3.micro"             # EC2 instance size
+aws_auth_profile = "default"              # AWS CLI profile
+vpc_name         = "ffmpeg-vpc"           # VPC name
+```
+
+### Deployment
+
+**Single-command deployment:**
+
 ```bash
 cd terraform-infra
 terraform init
-terraform plan
 terraform apply
 ```
 
-**Save these outputs:**
-- Instance Public IP
-- SSH command
-- Path to `.pem` key file
+Type `yes` when prompted. Terraform will:
+1. ✅ Create VPC and subnets
+2. ✅ Launch EC2 instance
+3. ✅ Generate SSH key pair
+4. ✅ Configure security groups
+5. ✅ Generate Ansible inventory
+6. ✅ Wait for instance readiness
+7. ✅ Run Ansible playbook
+8. ✅ Deploy Docker containers
 
-### 2️⃣ Configure Ansible Inventory
+**Estimated time:** 3-5 minutes
 
-Edit `ansible/inventory.ini` and replace `<PUBLIC_IP>` with your EC2 instance IP:
-```ini
-[webservers]
-ec2-instance ansible_host=<PUBLIC_IP> ansible_user=ubuntu ansible_ssh_private_key_file=../terraform-infra/ffmpeg-project-key.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'
-```
+### Verification
 
-### 3️⃣ Test Ansible Connection
+**View outputs:**
 ```bash
-cd ansible
-ansible -i inventory.ini -m ping ec2-instance
+terraform output
 ```
 
-Expected output: `ec2-instance | SUCCESS => { "ping": "pong" }`
-
-### 4️⃣ Deploy the Application
-```bash
-ansible-playbook -i inventory.ini deploy.yml
+**Access the application:**
+```
+http://<instance_public_ip>
 ```
 
-Wait for the playbook to complete (usually 2-3 minutes).
-
-### 5️⃣ Access Your Application
-
-Open your browser and visit:
-```
-http://<your-ec2-public-ip>
-```
-
-You should see a beautiful web page displaying the pooping bird from the video! 🎉
+You should see a web page displaying the last frame from Big Buck Bunny!
 
 ---
 
 ## 🧹 Cleanup
 
-To destroy all AWS resources and avoid charges:
+To destroy all AWS resources:
+
 ```bash
 cd terraform-infra
 terraform destroy
 ```
 
-Type `yes` when prompted.
+Type `yes` when prompted. This will:
+- Terminate EC2 instance
+- Delete security groups
+- Remove VPC and subnets  
+- Clean up SSH keys
+
+**Note:** Local `.pem` file and Ansible inventory remain on disk. Delete manually if desired.
 
 ---
 
-## 🔧 Troubleshooting
+## 🔧 Technical Details
 
-**Ansible can't connect?**
-- Verify the `.pem` file has correct permissions: `chmod 400 terraform-infra/*.pem`
-- Test SSH manually: `ssh -i terraform-infra/ffmpeg-project-key.pem ubuntu@<PUBLIC_IP>`
-- Check security group allows port 22 from your IP
+### Terraform Features Used
 
-**Docker containers not starting?**
-- SSH into the instance and check logs: `docker-compose logs`
-- Verify Docker service is running: `sudo systemctl status docker`
+- **Modules:** Anton Babenko's community modules for VPC and EC2
+- **Data Sources:** Dynamic AMI lookup, external IP detection
+- **Locals:** Computed values (IP CIDR formatting)
+- **Provisioners:** `local-exec` for Ansible automation
+- **Lifecycle Rules:** Prevent SSH key regeneration
+- **Templates:** Dynamic Ansible inventory generation
+- **Null Resources:** Orchestration delays and triggers
 
-**Can't access the web page?**
-- Verify security group allows port 80
-- Check if NGINX is running: `docker ps`
-- Test locally on the instance: `curl localhost`
+### Docker Features Used
 
----
+- **Shared volumes:** Inter-container communication
+- **Depends_on conditions:** Service completion tracking
+- **Layer caching:** Efficient rebuilds
 
-## 🎯 Improvement Ideas
+### Ansible Features Used
 
-- [ ] Integrate Ansible with Terraform using `local-exec` provisioner (run everything with just `terraform apply`)
-- [ ] Add health checks and auto-restart for containers
-- [ ] Implement continuous frame updates for live streams (in this case it was a video file)
-- [ ] Use S3 for persistent frame storage
-- [ ] Use S3 for state storage
-- [ ] Add CI/CD pipeline with GitHub Actions
+- **Variables:** Reusable configuration values
+- **Handlers:** Could be added for service restarts
+- **Wait_for:** Application readiness checks
+- **Copy module:** Efficient file transfer
 
 ---
 
+## 🎯 Key Design Decisions
 
-**Built with haves using Terraform, Ansible, Docker, FFMPEG, and NGINX**
+**Why this architecture?**
+
+1. **Single-command deployment** - Entire stack via `terraform apply`
+2. **Immutable infrastructure** - Terraform manages all resources
+3. **Separation of concerns** - Infrastructure, config, and app layers
+4. **Community modules** - Production-tested, maintained code
+5. **Auto-generated inventory** - No manual Ansible configuration
+6. **Stateless FFMPEG** - Runs once, stores result, exits
+7. **Shared volumes** - Clean container communication
+
+
+
+---
+
+## 🚀 Improvements & Next Steps
+
+**Implemented:**
+- ✅ Automated infrastructure provisioning
+- ✅ Zero-touch deployment
+- ✅ Container orchestration
+- ✅ Auto-generated inventory
+- ✅ Restrict SSH to specific IP using `local.my_ip`
+- ✅ Lifecycle management for keys
+
+**Potential enhancements:**
+
+- [ ] Add S3 backend for Terraform state
+- [ ] Implement CI/CD with GitHub Actions
+- [ ] Add validations for variables
+
+---
+
+**Built using Terraform, Ansible, Docker, FFMPEG, and NGINX**
+
+*Demonstrates: Infrastructure as Code, Configuration Management, Containerization, Automation*# 🎬 FFMPEG Video Frame Extractor
+
