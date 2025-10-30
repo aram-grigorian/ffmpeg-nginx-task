@@ -11,10 +11,11 @@ module "ec2_instance" {
 
   security_group_ingress_rules = {
     ssh = {
-      cidr_ipv4   = "0.0.0.0/0"
       from_port   = 22
       to_port     = 22
-      ip_protocol = "tcp"
+      protocol    = "tcp"
+      description = "ssh"
+      cidr_ipv4   = "0.0.0.0/0"
     }
 
     nginx = {
@@ -29,6 +30,8 @@ module "ec2_instance" {
   ami = data.aws_ami.ubuntu.id
 
   tags = {
-    Name = var.instance_name
+    Name        = var.instance_name
+    Terraform   = true
+    Environment = "dev"
   }
 }

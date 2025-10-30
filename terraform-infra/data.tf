@@ -9,3 +9,8 @@ data "aws_ami" "ubuntu" {
 
 }
 
+
+data "http" "myip" {
+  url = "https://ipv4.icanhazip.com/"
+}
+
