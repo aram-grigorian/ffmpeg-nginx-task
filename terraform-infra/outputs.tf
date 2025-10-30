@@ -12,7 +12,7 @@ output "instance_public_ip" {
 output "private_key_path" {
   description = "Path to the private key file"
   value       = local_file.private_key.filename
-  sensitive = true
+  sensitive   = true
 }
 
 # Was needed only for my convenience 
