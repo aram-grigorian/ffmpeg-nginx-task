@@ -15,7 +15,7 @@ module "ec2_instance" {
       to_port     = 22
       protocol    = "tcp"
       description = "ssh"
-      cidr_ipv4   = "0.0.0.0/0"
+      cidr_ipv4   = local.my_ip
     }
 
     nginx = {
